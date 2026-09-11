@@ -1,0 +1,44 @@
+<Project>
+  <ItemGroup>
+    <VertexShader Include="**/*.vert" />
+    <FragmentShader Include="**/*.frag" />
+  </ItemGroup>
+
+  <Target
+    Name="CompileVertexShaders"
+    BeforeTargets="BeforeBuild"
+    Inputs="@(VertexShader)"
+    Outputs="$(SpvDir)/%(VertexShader.FileName).vert.spv"
+  >
+    <PropertyGroup>
+      <Spv>$(SpvDir)/%(VertexShader.FileName).vert.spv</Spv>
+    </PropertyGroup>
+    <Message Text="@(VertexShader) =&gt; $(Spv)" Importance="high" />
+    <MakeDir Directories="$(SpvDir)" Condition="!Exists($(SpvDir))" />
+    <Exec
+      Command="&quot;$(Glslc)&quot; -fshader-stage=vertex &quot;@(VertexShader)&quot; -o &quot;$(Spv)&quot;"
+    ></Exec>
+    <ItemGroup>
+      <EmbeddedResource Include="$(Spv)" LogicalName="%(VertexShader.FileName).vert.spv" />
+    </ItemGroup>
+  </Target>
+
+  <Target
+    Name="CompileFragmentShaders"
+    BeforeTargets="BeforeBuild"
+    Inputs="@(FragmentShader)"
+    Outputs="$(SpvDir)/%(FragmentShader.FileName).frag.spv"
+  >
+    <PropertyGroup>
+      <Spv>$(SpvDir)/%(FragmentShader.FileName).frag.spv</Spv>
+    </PropertyGroup>
+    <Message Text="@(FragmentShader) =&gt; $(Spv)" Importance="high" />
+    <MakeDir Directories="$(SpvDir)" Condition="!Exists($(SpvDir))" />
+    <Exec
+      Command="&quot;$(Glslc)&quot; -fshader-stage=fragment &quot;@(FragmentShader)&quot; -o &quot;$(Spv)&quot;"
+    ></Exec>
+    <ItemGroup>
+      <EmbeddedResource Include="$(Spv)" LogicalName="%(FragmentShader.FileName).frag.spv" />
+    </ItemGroup>
+  </Target>
+</Project>
