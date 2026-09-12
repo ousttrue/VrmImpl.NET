@@ -1,4 +1,5 @@
 ﻿using System.Text;
+using Microsoft.Extensions.Logging;
 using Vortice.Vulkan;
 using static Vortice.Vulkan.Vulkan;
 
@@ -13,6 +14,8 @@ static class Program
 
     public static unsafe void Main()
     {
+        var logger = StaticLogger.Factory.CreateLogger("Program");
+
         using var window = new GlfwWindow();
         using var instance = new VulkanInstanceObject(window);
         var picked = VulkanPhysicalDeviceInfo.Pick(

@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using Microsoft.Extensions.Logging;
 using Vortice.Vulkan;
 using static Vortice.Vulkan.Vulkan;
 
@@ -40,8 +41,8 @@ public record struct VulkanPhysicalDeviceInfo(
                 selected = "[*]";
                 _picked = info.PhysicalDevice;
             }
-            Console.WriteLine(
-                $"{selected} Extensions: {has}, Swapchain: {supported} => {info}"
+            VulkanDebugUtilsMessengerObject.Logger.LogDebug(
+                $"GPU#{i} {selected} Extensions: {has}, Swapchain: {supported}, {info}"
             );
         }
 

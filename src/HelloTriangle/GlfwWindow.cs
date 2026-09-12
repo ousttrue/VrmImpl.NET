@@ -1,4 +1,6 @@
+using System.Reflection.Metadata;
 using System.Runtime.InteropServices;
+using Microsoft.Extensions.Logging;
 using Silk.NET.Core.Native;
 using Silk.NET.GLFW;
 
@@ -8,6 +10,7 @@ unsafe class GlfwWindow : IDisposable
 {
     static readonly Glfw glfw;
     public static readonly string[] InstanceExtensions;
+    static readonly ILogger Logger;
 
     static GlfwWindow()
     {
@@ -16,8 +19,10 @@ unsafe class GlfwWindow : IDisposable
         InstanceExtensions = new string[extensions_count];
         for (int i = 0; i < extensions_count; ++i)
         {
-            InstanceExtensions[i] = Marshal.PtrToStringAnsi((nint)extensions[i]) ?? throw new Exception();
+            InstanceExtensions[i] =
+                Marshal.PtrToStringAnsi((nint)extensions[i]) ?? throw new Exception();
         }
+        Logger = StaticLogger.Factory.CreateLogger("glfw");
     }
 
     const uint WIDTH = 800;
@@ -37,7 +42,7 @@ unsafe class GlfwWindow : IDisposable
         // var m = glfw.GetWindowMonitor(_window);
         var m = glfw.GetPrimaryMonitor();
         glfw.GetMonitorContentScale(m, out var xscale, out var yscale);
-        Console.WriteLine($"MonitorScale: {xscale}:{yscale}");
+        Logger.LogDebug($"MonitorScale: {xscale}:{yscale}");
     }
 
     public void Dispose()
