@@ -1,17 +1,22 @@
+// https://github.com/Overv/VulkanTutorial/blob/main/code/15_hello_triangle.cpp
+
+using System.Runtime.InteropServices;
 using Vortice.Vulkan;
 using static Vortice.Vulkan.Vulkan;
 
-class VulkanRenderTarget : IDisposable
+namespace VrmImpl.VorticeVulkan;
+
+public class VulkanRenderTarget : IDisposable
 {
     private readonly VkDeviceApi _vkd;
-    public readonly VkRenderPass RenderPass;
-
-    private readonly VkImageView[] _imageViews;
-    private readonly VkFramebuffer[] _framebuffers;
-
-    private VkCommandPool _commandPool;
-    private VkCommandBuffer _commandBuffer;
+    private readonly uint _graphicsQueueFamilyIndex;
     private readonly VkQueue _graphicsQueue;
+
+    private VkRenderPass? _renderPass;
+    private VkImageView[] _imageViews = [];
+    private VkFramebuffer[] _framebuffers = [];
+    private VkCommandPool? _commandPool;
+    private VkCommandBuffer _commandBuffer;
 
     public unsafe VulkanRenderTarget(
         VkDeviceApi vkd,
@@ -22,8 +27,15 @@ class VulkanRenderTarget : IDisposable
     )
     {
         _vkd = vkd;
+        _graphicsQueueFamilyIndex = graphicsFamily;
         vkd.vkGetDeviceQueue(graphicsFamily, 0, out _graphicsQueue);
 
+        Create(format, extent, images);
+    }
+
+    public unsafe void Create(VkFormat format, VkExtent2D extent, VkImage[] images)
+    {
+        Dispose();
         {
             _imageViews = new VkImageView[images.Length];
             for (int i = 0; i < images.Length; ++i)
@@ -51,6 +63,7 @@ class VulkanRenderTarget : IDisposable
                 }
             }
         }
+        VkRenderPass renderPass;
         {
             var colorAttachment = new VkAttachmentDescription
             {
@@ -98,10 +111,11 @@ class VulkanRenderTarget : IDisposable
                 pDependencies = &dependency,
             };
 
-            if (_vkd.vkCreateRenderPass(&renderPassInfo, null, out RenderPass) != VK_SUCCESS)
+            if (_vkd.vkCreateRenderPass(&renderPassInfo, null, out renderPass) != VK_SUCCESS)
             {
                 throw new Exception("failed to create render pass!");
             }
+            _renderPass = renderPass;
         }
         {
             _framebuffers = new VkFramebuffer[_imageViews.Length];
@@ -113,7 +127,7 @@ class VulkanRenderTarget : IDisposable
                 var framebufferInfo = new VkFramebufferCreateInfo
                 {
                     sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-                    renderPass = RenderPass,
+                    renderPass = renderPass,
                     attachmentCount = 1,
                     pAttachments = &attachment,
                     width = extent.width,
@@ -135,18 +149,19 @@ class VulkanRenderTarget : IDisposable
         {
             sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
             flags = VkCommandPoolCreateFlags.ResetCommandBuffer,
-            queueFamilyIndex = graphicsFamily,
+            queueFamilyIndex = _graphicsQueueFamilyIndex,
         };
 
-        if (_vkd.vkCreateCommandPool(&poolInfo, null, out _commandPool) != VK_SUCCESS)
+        if (_vkd.vkCreateCommandPool(&poolInfo, null, out var commandPool) != VK_SUCCESS)
         {
             throw new Exception("failed to create command pool!");
         }
+        _commandPool = commandPool;
 
         var allocInfo = new VkCommandBufferAllocateInfo
         {
             sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-            commandPool = _commandPool,
+            commandPool = commandPool,
             level = VkCommandBufferLevel.Primary,
             commandBufferCount = 1,
         };
@@ -161,20 +176,29 @@ class VulkanRenderTarget : IDisposable
 
     public unsafe void Dispose()
     {
-        _vkd.vkDestroyCommandPool(_commandPool, null);
-
+        if (_commandPool is VkCommandPool commandPool)
+        {
+            _vkd.vkDestroyCommandPool(commandPool, null);
+            _commandPool = null;
+        }
         foreach (var framebuffer in _framebuffers)
         {
             _vkd.vkDestroyFramebuffer(framebuffer, null);
         }
+        _framebuffers = [];
         foreach (var imageView in _imageViews)
         {
             _vkd.vkDestroyImageView(imageView, null);
         }
-        _vkd.vkDestroyRenderPass(RenderPass, null);
+        _imageViews = [];
+        if (_renderPass is VkRenderPass renderPass)
+        {
+            _vkd.vkDestroyRenderPass(renderPass, null);
+            _renderPass = null;
+        }
     }
 
-    public unsafe void vkEndSubmitCommandBuffer(
+    public unsafe void EndSubmitCommandBuffer(
         VkSemaphore imageAvailableSemaphore,
         VkSemaphore renderFinishedSemaphore,
         VkFence inFlightFence
@@ -232,9 +256,12 @@ class VulkanRenderTarget : IDisposable
         var renderPassInfo = new VkRenderPassBeginInfo
         {
             sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-            renderPass = RenderPass,
             framebuffer = _framebuffers[imageIndex],
         };
+        if (_renderPass is VkRenderPass renderPass)
+        {
+            renderPassInfo.renderPass = renderPass;
+        }
         renderPassInfo.renderArea.offset = new(0, 0);
         renderPassInfo.renderArea.extent = extent;
 

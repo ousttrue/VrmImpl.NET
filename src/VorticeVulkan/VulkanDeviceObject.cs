@@ -1,11 +1,13 @@
 using Vortice.Vulkan;
 using static Vortice.Vulkan.Vulkan;
 
-namespace VrmImpl;
+namespace VrmImpl.VorticeVulkan;
 
 public class VulkanDeviceObject : IDisposable
 {
-    private readonly VkDevice device;
+    public readonly uint GraphicsQueueFamilyIndex;
+    public readonly uint PresentQueueFamilyIndex;
+    public readonly VkDevice Device;
     public readonly VkDeviceApi Api;
 
     public unsafe VulkanDeviceObject(
@@ -16,6 +18,9 @@ public class VulkanDeviceObject : IDisposable
         ReadOnlySpan<string> deviceExtensions
     )
     {
+        GraphicsQueueFamilyIndex = graphicsFamily;
+        PresentQueueFamilyIndex = presentFamily;
+
         var uniqueQueueFamilies = new HashSet<uint>() { graphicsFamily, presentFamily };
         var queueCreateInfos = stackalloc VkDeviceQueueCreateInfo[2];
         float queuePriority = 1.0f;
@@ -67,11 +72,11 @@ public class VulkanDeviceObject : IDisposable
         //     (createInfo.enabledLayerCount, createInfo.ppEnabledLayerNames) = layers;
         // }
 
-        if (vki.vkCreateDevice(physicalDevice, &createInfo, null, out device) != VK_SUCCESS)
+        if (vki.vkCreateDevice(physicalDevice, &createInfo, null, out Device) != VK_SUCCESS)
         {
             throw new Exception("failed to create logical device!");
         }
-        Api = new VkDeviceApi(vki, device);
+        Api = new VkDeviceApi(vki, Device);
     }
 
     public unsafe void Dispose()

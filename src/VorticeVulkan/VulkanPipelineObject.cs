@@ -1,9 +1,9 @@
 using Vortice.Vulkan;
 using static Vortice.Vulkan.Vulkan;
 
-namespace VrmImpl;
+namespace VrmImpl.VorticeVulkan;
 
-class VulkanPipelineObject : IDisposable
+public class VulkanPipelineObject : IDisposable
 {
     static unsafe VkShaderModule createShaderModule(VkDeviceApi vkd, ReadOnlySpan<byte> code)
     {
@@ -27,19 +27,24 @@ class VulkanPipelineObject : IDisposable
 
     VkDeviceApi _vkd;
 
+    public readonly VkDescriptorSetLayout DescriptorSetLayout;
+
     private readonly VkPipelineLayout pipelineLayout;
 
     private readonly VkPipeline graphicsPipeline;
 
-    public unsafe VulkanPipelineObject(VkDeviceApi vkd, VkFormat format, VkRenderPass? renderPass)
+    public unsafe VulkanPipelineObject(
+        VkDeviceApi vkd,
+        VkFormat format,
+        VkRenderPass? renderPass,
+        byte[] vs,
+        byte[] fs
+    )
     {
         _vkd = vkd;
 
-        var vertShaderCode = ProjectResource.FromAssembly("shader.vert.spv");
-        var vertShaderModule = createShaderModule(vkd, vertShaderCode);
-
-        var fragShaderCode = ProjectResource.FromAssembly("shader.frag.spv");
-        var fragShaderModule = createShaderModule(vkd, fragShaderCode);
+        var vertShaderModule = createShaderModule(vkd, vs);
+        var fragShaderModule = createShaderModule(vkd, fs);
 
         fixed (byte* main = "main"u8)
         {
@@ -200,6 +205,40 @@ class VulkanPipelineObject : IDisposable
     {
         _vkd.vkDestroyPipeline(graphicsPipeline, null);
         _vkd.vkDestroyPipelineLayout(pipelineLayout, null);
+    }
+
+    public unsafe void Bind(
+        VkCommandBuffer commandBuffer,
+        VkExtent2D extent,
+        VkDescriptorSet descriptorSet
+    )
+    {
+        VkViewport viewport = new()
+        {
+            x = 0,
+            y = 0,
+            width = extent.width,
+            height = extent.height,
+            minDepth = 0,
+            maxDepth = 1,
+        };
+        _vkd.vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+        VkRect2D scissor = new() { offset = { x = 0, y = 0 }, extent = extent };
+        _vkd.vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+        _vkd.vkCmdBindPipeline(commandBuffer, VkPipelineBindPoint.Graphics, graphicsPipeline);
+
+        _vkd.vkCmdBindDescriptorSets(
+            commandBuffer,
+            VkPipelineBindPoint.Graphics,
+            pipelineLayout,
+            0,
+            1,
+            &descriptorSet,
+            0,
+            null
+        );
     }
 
     public void RecordCommandBuffer(VkCommandBuffer commandBuffer)

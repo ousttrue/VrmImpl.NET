@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging;
 
-namespace VrmImpl;
+namespace VrmImpl.VorticeVulkan;
 
 public partial class VulkanLogger
 {

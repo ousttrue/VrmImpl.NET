@@ -4,9 +4,9 @@ using Microsoft.Extensions.Logging;
 using Silk.NET.Core.Native;
 using Silk.NET.GLFW;
 
-namespace VrmImpl;
+namespace VrmImpl.Gui;
 
-unsafe class GlfwWindow : IDisposable
+public unsafe class GlfwWindow : IDisposable
 {
     static readonly Glfw glfw;
     public static readonly string[] InstanceExtensions;
@@ -28,14 +28,15 @@ unsafe class GlfwWindow : IDisposable
 
     private readonly ILogger _logger;
     private readonly WindowHandle* _window;
+    public WindowHandle* WindowHandle => _window;
 
-    public GlfwWindow(ILoggerFactory factory)
+    public GlfwWindow(ILoggerFactory factory, bool resizable)
     {
         _logger = factory.CreateLogger("Glfw");
         glfw.Init();
 
         glfw.WindowHint(WindowHintClientApi.ClientApi, ClientApi.NoApi);
-        glfw.WindowHint(WindowHintBool.Resizable, false);
+        glfw.WindowHint(WindowHintBool.Resizable, resizable);
 
         _window = glfw.CreateWindow((int)WIDTH, (int)HEIGHT, "Vulkan", null, null);
 
@@ -79,13 +80,18 @@ unsafe class GlfwWindow : IDisposable
         return (width, height);
     }
 
-    public bool NextFrame()
+    public (int, int)? NewFrame()
     {
         if (glfw.WindowShouldClose(_window))
         {
-            return false;
+            return default;
         }
         glfw.PollEvents();
-        return true;
+        return GetExtent();
+    }
+
+    public bool IsIconified()
+    {
+        return glfw.GetWindowAttrib(_window, WindowAttributeGetter.Iconified);
     }
 }

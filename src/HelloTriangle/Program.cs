@@ -1,16 +1,28 @@
-﻿using System.Text;
+﻿using System.Reflection;
+using System.Text;
 using Microsoft.Extensions.Logging;
 using Vortice.Vulkan;
+using VrmImpl.Gui;
+using VrmImpl.VorticeVulkan;
 using static Vortice.Vulkan.Vulkan;
 
 namespace VrmImpl;
 
 static class Program
 {
-    static readonly string[] DeviceExtensions =
-    [
-        Encoding.ASCII.GetString(VK_KHR_SWAPCHAIN_EXTENSION_NAME),
-    ];
+    public static byte[] FromAssembly(Assembly assm, string name)
+    {
+        using var stream =
+            assm.GetManifestResourceStream(name)
+            ?? throw new Exception($"GetManifestResourceStream: {name}");
+        // var reader = new StreamReader(stream);
+        // return reader.ReadToEnd();
+        using (MemoryStream ms = new MemoryStream())
+        {
+            stream.CopyTo(ms);
+            return ms.ToArray();
+        }
+    }
 
     public static unsafe void Main()
     {
@@ -24,19 +36,20 @@ static class Program
         });
         VulkanLogger.Inject(loggerFactory);
 
-        using var window = new GlfwWindow(loggerFactory);
-        using var instance = new VulkanInstanceObject(window);
-        var picked = VulkanPhysicalDeviceInfo.Pick(
-            instance.Api,
-            DeviceExtensions,
-            instance.Surface
-        );
+        using var window = new GlfwWindow(loggerFactory, resizable: true);
+        using var instance = new VulkanInstanceObject(window.GetVkExtensions());
+        var surface = window.CreateVkSurface(instance.Instance.Handle);
+        using var disposer = new ActionDisposer(() =>
+        {
+            instance.Api.vkDestroySurfaceKHR(surface);
+        });
 
-        var indices = VulkanQueueFamilyIndices.findQueueFamilies(
-            instance.Api,
-            picked,
-            instance.Surface
-        );
+        ReadOnlySpan<string> DeviceExtensions =
+        [
+            Encoding.ASCII.GetString(VK_KHR_SWAPCHAIN_EXTENSION_NAME),
+        ];
+        var picked = VulkanPhysicalDeviceInfo.Pick(instance.Api, DeviceExtensions, surface);
+        var indices = VulkanQueueFamilyIndices.findQueueFamilies(instance.Api, picked, surface);
         using var device = new VulkanDeviceObject(
             instance.Api,
             picked,
@@ -49,7 +62,7 @@ static class Program
         using var swapchain = new VulkanSwapchainObject(
             instance.Api,
             picked,
-            instance.Surface,
+            surface,
             device.Api,
             new(w, h)
         );
@@ -60,28 +73,62 @@ static class Program
             swapchain.Extent,
             swapchain.Images
         );
+
+        var assm = Assembly.GetExecutingAssembly();
+        var vs = FromAssembly(assm, "shader.vert.spv");
+        var fs = FromAssembly(assm, "shader.frag.spv");
+
         using var pipeline = new VulkanPipelineObject(
             device.Api,
             swapchain.Format,
             // renderTarget.RenderPass
-            null
+            null,
+            vs,
+            fs
         );
 
+        var resizeSwapchain = false;
         while (true)
         {
-            if (!window.NextFrame())
+            if (window.NewFrame() is not (int fb_width, int fb_height))
             {
                 break;
             }
-            var (imageIndex, imageAvailableSemaphore, renderFinishedSemaphore, inFlightFence) =
-                swapchain.Acquire();
+            var extent = new VkExtent2D(fb_width, fb_height);
+            if (resizeSwapchain || swapchain.ShouldRecreate(extent))
+            {
+                device.Api.vkDeviceWaitIdle();
+                renderTarget.Dispose();
+                swapchain.Resize(extent);
+                renderTarget.Create(swapchain.Format, extent, swapchain.Images);
+                continue;
+            }
+            if (window.IsIconified())
+            {
+                Thread.Sleep(10);
+                continue;
+            }
 
-            VkClearColorValue clearColor = default;
-            clearColor.float32[0] = 0.0f;
-            clearColor.float32[1] = 0.0f;
-            clearColor.float32[2] = 0.0f;
-            clearColor.float32[2] = 1.0f;
-            ReadOnlySpan<VkClearValue> clearValues = [new VkClearValue { color = clearColor }];
+            if (
+                swapchain.Acquire()
+                is not
+                (
+                    uint imageIndex,
+                    VkSemaphore imageAvailableSemaphore,
+                    VkSemaphore renderFinishedSemaphore,
+                    VkFence inFlightFence
+                )
+            )
+            {
+                resizeSwapchain = true;
+                continue;
+            }
+
+            VkClearValue clearColor = default;
+            clearColor.color.float32[0] = 0.0f;
+            clearColor.color.float32[1] = 0.0f;
+            clearColor.color.float32[2] = 0.0f;
+            clearColor.color.float32[2] = 1.0f;
             // var (commandBuffer, renderFinishedSemaphore) = renderTarget.BeginRenderPass(
             //     imageIndex,
             //     clearValues
@@ -90,14 +137,14 @@ static class Program
                 imageIndex,
                 swapchain.Images[imageIndex],
                 swapchain.Extent,
-                clearValues
+                [clearColor]
             );
             {
                 pipeline.RecordCommandBuffer(commandBuffer);
             }
             // renderTarget.EndRenderPass();
             renderTarget.EndRendering(swapchain.Images[imageIndex]);
-            renderTarget.vkEndSubmitCommandBuffer(
+            renderTarget.EndSubmitCommandBuffer(
                 imageAvailableSemaphore,
                 renderFinishedSemaphore,
                 inFlightFence
@@ -106,6 +153,6 @@ static class Program
             swapchain.Present(imageIndex, renderFinishedSemaphore);
         }
 
-        device.Api.vkDeviceWaitIdle();
+        device.Api.vkDeviceWaitIdle().ThrowIfError();
     }
 }

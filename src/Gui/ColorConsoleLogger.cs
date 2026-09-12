@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Configuration;
 using Microsoft.Extensions.Options;
 
-namespace VrmImpl;
+namespace VrmImpl.Gui;
 
 public sealed class ColorConsoleLoggerConfiguration
 {

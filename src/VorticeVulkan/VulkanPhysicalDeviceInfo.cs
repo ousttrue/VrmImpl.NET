@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 using Vortice.Vulkan;
 using static Vortice.Vulkan.Vulkan;
 
-namespace VrmImpl;
+namespace VrmImpl.VorticeVulkan;
 
 public record struct VulkanPhysicalDeviceInfo(
     VkPhysicalDevice PhysicalDevice,
@@ -115,7 +115,7 @@ public record struct VulkanPhysicalDeviceInfo(
         VkSurfaceKHR surface
     )
     {
-        var swapchainSupport = SwapchainSupportDetails.querySwapchainSupport(
+        var swapchainSupport = VulkanSwapchainSupportDetails.querySwapchainSupport(
             vki,
             physicalDevice,
             surface

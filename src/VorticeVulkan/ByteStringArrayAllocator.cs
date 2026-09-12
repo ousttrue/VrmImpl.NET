@@ -2,7 +2,7 @@ using System.Collections;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace VrmImpl;
+namespace VrmImpl.VorticeVulkan;
 
 public unsafe class ByteStringArrayAllocator : IDisposable, IEnumerable
 {

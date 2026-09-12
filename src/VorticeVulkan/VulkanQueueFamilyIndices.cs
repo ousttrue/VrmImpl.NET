@@ -1,8 +1,8 @@
 using Vortice.Vulkan;
 
-namespace VrmImpl;
+namespace VrmImpl.VorticeVulkan;
 
-record struct VulkanQueueFamilyIndices(uint GraphicsFamily, uint PresentFamily)
+public record struct VulkanQueueFamilyIndices(uint GraphicsFamily, uint PresentFamily)
 {
     public static VulkanQueueFamilyIndices findQueueFamilies(
         VkInstanceApi vki,
