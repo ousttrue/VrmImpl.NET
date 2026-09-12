@@ -1,5 +1,4 @@
 using System.Runtime.InteropServices;
-using Microsoft.Extensions.Logging;
 using Vortice.Vulkan;
 using static Vortice.Vulkan.Vulkan;
 
@@ -7,8 +6,6 @@ namespace VrmImpl;
 
 class VulkanDebugUtilsMessengerObject : IDisposable
 {
-    public static readonly ILogger Logger = StaticLogger.Factory.CreateLogger("vulkan");
-
     [UnmanagedCallersOnly]
     private static unsafe uint debugCallback(
         VkDebugUtilsMessageSeverityFlagsEXT messageSeverity,
@@ -23,16 +20,16 @@ class VulkanDebugUtilsMessengerObject : IDisposable
             case VkDebugUtilsMessageSeverityFlagsEXT.None:
                 break;
             case VkDebugUtilsMessageSeverityFlagsEXT.Verbose:
-                Logger.LogTrace($"validation layer: {msg}");
+                VulkanLogger.Trace($"validation layer: {msg}");
                 break;
             case VkDebugUtilsMessageSeverityFlagsEXT.Info:
-                Logger.LogInformation($"validation layer: {msg}");
+                VulkanLogger.Info($"validation layer: {msg}");
                 break;
             case VkDebugUtilsMessageSeverityFlagsEXT.Warning:
-                Logger.LogWarning($"validation layer: {msg}");
+                VulkanLogger.Warn($"validation layer: {msg}");
                 break;
             case VkDebugUtilsMessageSeverityFlagsEXT.Error:
-                Logger.LogError($"validation layer: {msg}");
+                VulkanLogger.Error($"validation layer: {msg}");
                 break;
         }
         return VK_FALSE;

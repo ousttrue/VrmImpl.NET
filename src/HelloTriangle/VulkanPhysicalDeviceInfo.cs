@@ -41,7 +41,7 @@ public record struct VulkanPhysicalDeviceInfo(
                 selected = "[*]";
                 _picked = info.PhysicalDevice;
             }
-            VulkanDebugUtilsMessengerObject.Logger.LogDebug(
+            VulkanLogger.Debug(
                 $"GPU#{i} {selected} Extensions: {has}, Swapchain: {supported}, {info}"
             );
         }

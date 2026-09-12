@@ -10,7 +10,6 @@ unsafe class GlfwWindow : IDisposable
 {
     static readonly Glfw glfw;
     public static readonly string[] InstanceExtensions;
-    static readonly ILogger Logger;
 
     static GlfwWindow()
     {
@@ -22,16 +21,17 @@ unsafe class GlfwWindow : IDisposable
             InstanceExtensions[i] =
                 Marshal.PtrToStringAnsi((nint)extensions[i]) ?? throw new Exception();
         }
-        Logger = StaticLogger.Factory.CreateLogger("glfw");
     }
 
     const uint WIDTH = 800;
     const uint HEIGHT = 600;
 
+    private readonly ILogger _logger;
     private readonly WindowHandle* _window;
 
-    public GlfwWindow()
+    public GlfwWindow(ILoggerFactory factory)
     {
+        _logger = factory.CreateLogger("Glfw");
         glfw.Init();
 
         glfw.WindowHint(WindowHintClientApi.ClientApi, ClientApi.NoApi);
@@ -42,7 +42,7 @@ unsafe class GlfwWindow : IDisposable
         // var m = glfw.GetWindowMonitor(_window);
         var m = glfw.GetPrimaryMonitor();
         glfw.GetMonitorContentScale(m, out var xscale, out var yscale);
-        Logger.LogDebug($"MonitorScale: {xscale}:{yscale}");
+        _logger.LogDebug($"MonitorScale: {xscale}:{yscale}");
     }
 
     public void Dispose()

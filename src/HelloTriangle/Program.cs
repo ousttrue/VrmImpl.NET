@@ -14,9 +14,17 @@ static class Program
 
     public static unsafe void Main()
     {
-        var logger = StaticLogger.Factory.CreateLogger("Program");
+        var loggerFactory = LoggerFactory.Create(builder =>
+        {
+            builder.ClearProviders();
+            builder.AddColorConsoleLogger(configuration => { });
+#if DEBUG
+            builder.SetMinimumLevel(LogLevel.Debug);
+#endif
+        });
+        VulkanLogger.Inject(loggerFactory);
 
-        using var window = new GlfwWindow();
+        using var window = new GlfwWindow(loggerFactory);
         using var instance = new VulkanInstanceObject(window);
         var picked = VulkanPhysicalDeviceInfo.Pick(
             instance.Api,
