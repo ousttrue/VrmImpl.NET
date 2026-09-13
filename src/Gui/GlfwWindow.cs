@@ -30,7 +30,13 @@ public unsafe class GlfwWindow : IDisposable
     private readonly WindowHandle* _window;
     public WindowHandle* WindowHandle => _window;
 
-    public GlfwWindow(ILoggerFactory factory, bool resizable)
+    public GlfwWindow(
+        ILoggerFactory factory,
+        int width,
+        int height,
+        string windowTitle,
+        bool resizable
+    )
     {
         _logger = factory.CreateLogger("Glfw");
         glfw.Init();
@@ -38,7 +44,7 @@ public unsafe class GlfwWindow : IDisposable
         glfw.WindowHint(WindowHintClientApi.ClientApi, ClientApi.NoApi);
         glfw.WindowHint(WindowHintBool.Resizable, resizable);
 
-        _window = glfw.CreateWindow((int)WIDTH, (int)HEIGHT, "Vulkan", null, null);
+        _window = glfw.CreateWindow(width, height, windowTitle, null, null);
 
         // var m = glfw.GetWindowMonitor(_window);
         var m = glfw.GetPrimaryMonitor();

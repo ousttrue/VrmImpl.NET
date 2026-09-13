@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 using Vortice.Vulkan;
 using static Vortice.Vulkan.Vulkan;
 
-namespace VrmImpl;
+namespace VrmImpl.Gui;
 
 public class ShaderModuleObject : IDisposable
 {

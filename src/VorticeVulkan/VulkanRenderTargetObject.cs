@@ -1,12 +1,11 @@
 // https://github.com/Overv/VulkanTutorial/blob/main/code/15_hello_triangle.cpp
 
-using System.Runtime.InteropServices;
 using Vortice.Vulkan;
 using static Vortice.Vulkan.Vulkan;
 
 namespace VrmImpl.VorticeVulkan;
 
-public class VulkanRenderTarget : IDisposable
+public class VulkanRenderTargetObject : IDisposable
 {
     private readonly VkDeviceApi _vkd;
     private readonly uint _graphicsQueueFamilyIndex;
@@ -18,7 +17,7 @@ public class VulkanRenderTarget : IDisposable
     private VkCommandPool? _commandPool;
     private VkCommandBuffer _commandBuffer;
 
-    public unsafe VulkanRenderTarget(
+    public VulkanRenderTargetObject(
         VkDeviceApi vkd,
         uint graphicsFamily,
         VkFormat format,
@@ -199,7 +198,7 @@ public class VulkanRenderTarget : IDisposable
     }
 
     public unsafe void EndSubmitCommandBuffer(
-        VkSemaphore imageAvailableSemaphore,
+        ReadOnlySpan<VkSemaphore> waitSemaphores,
         VkSemaphore renderFinishedSemaphore,
         VkFence inFlightFence
     )
@@ -209,27 +208,30 @@ public class VulkanRenderTarget : IDisposable
             throw new Exception("failed to record command buffer!");
         }
 
-        var waitSemaphores = stackalloc VkSemaphore[] { imageAvailableSemaphore };
+        // var waitSemaphores = stackalloc VkSemaphore[] { imageAvailableSemaphore };
         var waitStages = stackalloc VkPipelineStageFlags[]
         {
             VkPipelineStageFlags.ColorAttachmentOutput,
         };
         var signalSemaphores = stackalloc VkSemaphore[] { renderFinishedSemaphore };
         var cmd = _commandBuffer;
-        var submitInfo = new VkSubmitInfo
+        fixed (VkSemaphore* pWaitSemaphores = waitSemaphores)
         {
-            sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-            waitSemaphoreCount = 1,
-            pWaitSemaphores = waitSemaphores,
-            pWaitDstStageMask = waitStages,
-            commandBufferCount = 1,
-            pCommandBuffers = &cmd,
-            signalSemaphoreCount = 1,
-            pSignalSemaphores = signalSemaphores,
-        };
-        if (_vkd.vkQueueSubmit(_graphicsQueue, 1, &submitInfo, inFlightFence) != VK_SUCCESS)
-        {
-            throw new Exception("failed to submit draw command buffer!");
+            var submitInfo = new VkSubmitInfo
+            {
+                sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+                waitSemaphoreCount = (uint)waitSemaphores.Length,
+                pWaitSemaphores = pWaitSemaphores,
+                pWaitDstStageMask = waitStages,
+                commandBufferCount = 1,
+                pCommandBuffers = &cmd,
+                signalSemaphoreCount = 1,
+                pSignalSemaphores = signalSemaphores,
+            };
+            if (_vkd.vkQueueSubmit(_graphicsQueue, 1, &submitInfo, inFlightFence) != VK_SUCCESS)
+            {
+                throw new Exception("failed to submit draw command buffer!");
+            }
         }
     }
 

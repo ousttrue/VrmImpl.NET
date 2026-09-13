@@ -4,7 +4,7 @@ using ImGuiNET;
 using Vortice.Vulkan;
 using static Vortice.Vulkan.Vulkan;
 
-namespace VrmImpl;
+namespace VrmImpl.Gui;
 
 class ImDrawVertBuffer : IDisposable
 {

@@ -1,8 +1,11 @@
 <Solution>
+  <Folder Name="/samples/">
+    <Project Path="samples/VrmViewer/VrmViewer.csproj" />
+    <Project Path="samples/ImGuiGlfwVulkan/ImGuiGlfwVulkan.csproj" />
+    <Project Path="samples/HelloTriangle/HelloTriangle.csproj" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/Gui/Gui.csproj" />
     <Project Path="src/VorticeVulkan/VorticeVulkan.csproj" />
-    <Project Path="samples/ImGuiGlfwVulkan/ImGuiGlfwVulkan.csproj" />
-    <Project Path="samples/HelloTriangle/HelloTriangle.csproj" />
   </Folder>
 </Solution>

@@ -36,7 +36,13 @@ static class Program
         });
         VulkanLogger.Inject(loggerFactory);
 
-        using var window = new GlfwWindow(loggerFactory, resizable: true);
+        using var window = new GlfwWindow(
+            loggerFactory,
+            1024,
+            768,
+            "HelloTriangle",
+            resizable: true
+        );
         using var instance = new VulkanInstanceObject(window.GetVkExtensions());
         var surface = window.CreateVkSurface(instance.Instance.Handle);
         using var disposer = new ActionDisposer(() =>
@@ -66,7 +72,7 @@ static class Program
             device.Api,
             new(w, h)
         );
-        using var renderTarget = new VulkanRenderTarget(
+        using var renderTarget = new VulkanRenderTargetObject(
             device.Api,
             indices.GraphicsFamily,
             swapchain.Format,
@@ -145,7 +151,7 @@ static class Program
             // renderTarget.EndRenderPass();
             renderTarget.EndRendering(swapchain.Images[imageIndex]);
             renderTarget.EndSubmitCommandBuffer(
-                imageAvailableSemaphore,
+                [imageAvailableSemaphore],
                 renderFinishedSemaphore,
                 inFlightFence
             );

@@ -6,7 +6,7 @@ using ImGuiNET;
 using Vortice.Vulkan;
 using static Vortice.Vulkan.Vulkan;
 
-namespace VrmImpl;
+namespace VrmImpl.Gui;
 
 public class ImGuiImplVulkan : IDisposable
 {
