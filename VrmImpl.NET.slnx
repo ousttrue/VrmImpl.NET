@@ -1,7 +1,8 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Gui/Gui.csproj" />
-    <Project Path="src/HelloTriangle/HelloTriangle.csproj" />
-    <Project Path="src/ImGuiGlfwVulkan/ImGuiGlfwVulkan.csproj" />
+    <Project Path="src/VorticeVulkan/VorticeVulkan.csproj" />
+    <Project Path="samples/ImGuiGlfwVulkan/ImGuiGlfwVulkan.csproj" />
+    <Project Path="samples/HelloTriangle/HelloTriangle.csproj" />
   </Folder>
 </Solution>
