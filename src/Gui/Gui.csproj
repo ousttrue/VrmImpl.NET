@@ -14,5 +14,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\VorticeVulkan\VorticeVulkan.csproj" />
+    <ProjectReference Include="..\SceneGraph\SceneGraph.csproj" />
+    <ProjectReference Include="..\SceneRenderer\SceneRenderer.csproj" />
   </ItemGroup>
 </Project>

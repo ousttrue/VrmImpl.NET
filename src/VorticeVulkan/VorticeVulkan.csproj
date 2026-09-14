@@ -7,7 +7,17 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="texture.png" LogicalName="texture.png" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.11" />
     <PackageReference Include="Vortice.Vulkan" Version="3.2.3" />
+    <PackageReference Include="shaderc.net" Version="0.1.0" />
+    <PackageReference Include="StbImageSharp" Version="2.30.16" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Drawlist\Drawlist.csproj" />
   </ItemGroup>
 </Project>

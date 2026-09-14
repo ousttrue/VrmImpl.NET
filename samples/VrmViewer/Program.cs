@@ -5,6 +5,7 @@ using ImGuiNET;
 using Microsoft.Extensions.Logging;
 using Vortice.Vulkan;
 using VrmImpl.Gui;
+using VrmImpl.SceneGraph;
 using VrmImpl.VorticeVulkan;
 using static Vortice.Vulkan.Vulkan;
 
@@ -14,6 +15,15 @@ internal class Program
 {
     private static unsafe void Main(string[] args)
     {
+        List<Scene> scenes = [];
+        foreach (var arg in args)
+        {
+            if (Scene.LoadFilePath(arg) is Scene scene)
+            {
+                scenes.Add(scene);
+            }
+        }
+
         var loggerFactory = LoggerFactory.Create(builder =>
         {
             builder.ClearProviders();
@@ -63,6 +73,7 @@ internal class Program
 
         using var imgui_context = new ImGuiContext();
         var io = ImGui.GetIO();
+        io.ConfigFlags |= ImGuiConfigFlags.DockingEnable;
         using var implGlfw = ImGuiImplGlfw.InitForVulkan(window.WindowHandle, true);
 
         var assm = Assembly.GetExecutingAssembly();
@@ -85,7 +96,6 @@ internal class Program
             instance.Api,
             device.Api,
             picked,
-            device.Device,
             (uint)font_width,
             (uint)font_height,
             VkImageUsageFlags.Sampled | VkImageUsageFlags.TransferDst
@@ -94,15 +104,14 @@ internal class Program
         var fontDesc = implVulkan.BindTexture(igFontTexture);
         implVulkan.SetFontTexture(fontDesc);
 
-        // var sceneManager = new SceneManager(
-        //     instance.Vk,
-        //     physicalDevice,
-        //     device.GraphicsQueueFamilyIndex,
-        //     device.Device,
-        //     (uint)swapchain.RenderTarget.Images.Length,
-        //     igPipeline
-        // );
-        // sceneManager.LoadFiles(args);
+        using var dockManager = new DockSceneRenderer(
+            instance.Api,
+            device.Api,
+            picked,
+            device.GraphicsQueueFamilyIndex,
+            (uint)swapchain.Images.Length,
+            implVulkan
+        );
 
         // Our state
         var clear_color = new Vector4(0.60f, 0.45f, 0.55f, 1.00f);
@@ -153,15 +162,10 @@ internal class Program
             implGlfw.NewFrame();
             ImGui.NewFrame();
 
-            // var renderTargetEnds = sceneManager.DrawDock(delta, flight.ImageIndex);
-
-            // Rendering
-            ImGui.Render();
-            var draw_data = ImGui.GetDrawData();
-            bool is_minimized = (
-                draw_data.DisplaySize.X <= 0.0f || draw_data.DisplaySize.Y <= 0.0f
-            );
-            if (!is_minimized)
+            // bool is_minimized = (
+            //     draw_data.DisplaySize.X <= 0.0f || draw_data.DisplaySize.Y <= 0.0f
+            // );
+            // if (!is_minimized)
             {
                 if (
                     swapchain.Acquire()
@@ -177,6 +181,22 @@ internal class Program
                     resized = true;
                     continue;
                 }
+
+                // var renderTargetEnds = sceneManager.DrawDock(delta, flight.ImageIndex);
+                // render scenes to renderTexture
+                var renderTargetEnds = dockManager.RenderSceneTextures(
+                    scenes,
+                    io.DeltaTime,
+                    imageIndex
+                );
+
+                // Rendering
+                ImGui.Render();
+                var draw_data = ImGui.GetDrawData();
+
+                // bool is_minimized = (
+                //     draw_data.DisplaySize.X <= 0.0f || draw_data.DisplaySize.Y <= 0.0f
+                // );
 
                 VkClearValue clearColor = default;
                 clearColor.color.float32[0] = clear_color.X * clear_color.W;

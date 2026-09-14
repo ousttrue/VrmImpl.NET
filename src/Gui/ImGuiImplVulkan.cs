@@ -4,11 +4,13 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using ImGuiNET;
 using Vortice.Vulkan;
+using VrmImpl.SceneRenderer;
+using VrmImpl.VorticeVulkan;
 using static Vortice.Vulkan.Vulkan;
 
 namespace VrmImpl.Gui;
 
-public class ImGuiImplVulkan : IDisposable
+public class ImGuiImplVulkan : IDisposable, SceneTexture.IPipeline
 {
     private readonly VkDeviceApi _vd;
     private readonly VkDevice _device;
@@ -80,7 +82,7 @@ public class ImGuiImplVulkan : IDisposable
         _vertBuffers = new ImDrawVertBuffer[swapchainImageCount];
         for (int i = 0; i < _vertBuffers.Length; ++i)
         {
-            _vertBuffers[i] = new(vi, vd, _device);
+            _vertBuffers[i] = new(vi, vd);
         }
         _vertBufferIndex = 0;
 
@@ -220,10 +222,10 @@ public class ImGuiImplVulkan : IDisposable
         return desc;
     }
 
-    // public void UnbindTexture(DescriptorSet texture)
-    // {
-    //     _descriptorSetPool.Add(texture);
-    // }
+    public void UnbindTexture(VkDescriptorSet texture)
+    {
+        _descriptorSetPool.Add(texture);
+    }
 
     public void SetFontTexture(VkDescriptorSet fontTexture)
     {

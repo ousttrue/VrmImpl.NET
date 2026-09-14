@@ -10,6 +10,7 @@
   <Folder Name="/src/">
     <Project Path="src/Gui/Gui.csproj" />
     <Project Path="src/SceneGraph/SceneGraph.csproj" />
+    <Project Path="src/SceneRenderer/SceneRenderer.csproj" />
     <Project Path="src/VorticeVulkan/VorticeVulkan.csproj" />
   </Folder>
 </Solution>

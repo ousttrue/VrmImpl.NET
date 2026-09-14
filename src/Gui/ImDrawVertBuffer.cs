@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using ImGuiNET;
 using Vortice.Vulkan;
+using VrmImpl.VorticeVulkan;
 using static Vortice.Vulkan.Vulkan;
 
 namespace VrmImpl.Gui;
@@ -11,12 +12,11 @@ class ImDrawVertBuffer : IDisposable
     public ArrayBufferObject Vertex;
     public ArrayBufferObject Index;
 
-    public ImDrawVertBuffer(VkInstanceApi vi, VkDeviceApi vd, VkDevice device)
+    public ImDrawVertBuffer(VkInstanceApi vi, VkDeviceApi vd)
     {
         Vertex = new ArrayBufferObject(
             vi,
             vd,
-            device,
             VkBufferUsageFlags.VertexBuffer,
             VkMemoryPropertyFlags.HostVisible,
             (uint)Marshal.SizeOf<ImDrawVert>()
@@ -24,7 +24,6 @@ class ImDrawVertBuffer : IDisposable
         Index = new ArrayBufferObject(
             vi,
             vd,
-            device,
             VkBufferUsageFlags.IndexBuffer,
             VkMemoryPropertyFlags.HostVisible,
             (uint)Marshal.SizeOf<ushort>()

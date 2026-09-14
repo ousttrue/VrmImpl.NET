@@ -136,7 +136,6 @@ static unsafe class Program
             instance.Api,
             device.Api,
             picked,
-            device.Device,
             (uint)font_width,
             (uint)font_height,
             VkImageUsageFlags.Sampled | VkImageUsageFlags.TransferDst
