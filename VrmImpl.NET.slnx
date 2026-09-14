@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/Drawlist/">
+    <Project Path="src/Drawlist/Drawlist.csproj" />
+  </Folder>
   <Folder Name="/samples/">
     <Project Path="samples/VrmViewer/VrmViewer.csproj" />
     <Project Path="samples/ImGuiGlfwVulkan/ImGuiGlfwVulkan.csproj" />
@@ -6,6 +9,7 @@
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Gui/Gui.csproj" />
+    <Project Path="src/SceneGraph/SceneGraph.csproj" />
     <Project Path="src/VorticeVulkan/VorticeVulkan.csproj" />
   </Folder>
 </Solution>
