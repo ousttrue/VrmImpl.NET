@@ -1,7 +1,7 @@
 using System.Numerics;
 using ImGuiNET;
-using VrmImpl.SceneGraph;
 using Vortice.Vulkan;
+using VrmImpl.SceneGraph;
 using VrmImpl.SceneRenderer;
 
 namespace VrmImpl.Gui;
@@ -15,7 +15,7 @@ public class DockSceneRenderer : IDisposable
     private readonly uint _imageCount;
     private readonly SceneTexture.IPipeline _pipeline;
 
-    private readonly Dictionary<Scene, (SceneTexture, Dock)> _sceneMap = [];
+    private readonly Dictionary<Scene, (SceneTexture, Dock<uint>)> _sceneMap = [];
 
     private readonly DockManager _dockManager = new();
     private readonly List<VkSemaphore> _renderTargetEnds = [];
@@ -36,7 +36,14 @@ public class DockSceneRenderer : IDisposable
         _imageCount = imageCount;
         _pipeline = igPipeline;
 
-        _dockManager.AddDock("Dear ImGui Demo", "d", ImGui.ShowDemoWindow);
+        _dockManager.AddDock(
+            "Dear ImGui Demo",
+            "d",
+            (ref bool p, uint _) =>
+            {
+                ImGui.ShowDemoWindow(ref p);
+            }
+        );
     }
 
     public void Dispose()
@@ -54,7 +61,7 @@ public class DockSceneRenderer : IDisposable
     ///
     /// return renderFinishedSemaphore for renderTarget.
     /// </summary>
-    private static VkSemaphore? ImGuiRenderTarget(SceneTexture sceneTexture)
+    private static VkSemaphore? ImGuiRenderTarget(SceneTexture sceneTexture, uint imageIndex)
     {
         VkSemaphore? _semaphore = default;
         ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, Vector2.Zero);
@@ -96,7 +103,7 @@ public class DockSceneRenderer : IDisposable
             }
 
             if (
-                sceneTexture.Render(new((uint)wh.X, (uint)wh.Y)) is
+                sceneTexture.Render(imageIndex, new((uint)wh.X, (uint)wh.Y)) is
                 (VkSemaphore semaphore, VkDescriptorSet texture)
             )
             {
@@ -118,8 +125,13 @@ public class DockSceneRenderer : IDisposable
         return _semaphore;
     }
 
-    private (SceneTexture, Dock) GetOrCreateRenderTextureAndDock(Scene scene)
+    private (SceneTexture, Dock<uint>) GetOrCreateRenderTextureAndDock(Scene? scene)
     {
+        if (scene is null)
+        {
+            return default;
+        }
+
         if (_sceneMap.TryGetValue(scene, out var scene_dock))
         {
             return scene_dock;
@@ -136,12 +148,12 @@ public class DockSceneRenderer : IDisposable
             _pipeline
         );
 
-        var dock = new Dock(
+        var dock = new Dock<uint>(
             scene.Asset,
             "",
-            (ref bool p_open) =>
+            (ref bool p_open, uint imageIndex) =>
             {
-                if (ImGuiRenderTarget(sceneTexture) is VkSemaphore semaphore)
+                if (ImGuiRenderTarget(sceneTexture, imageIndex) is VkSemaphore semaphore)
                 {
                     _renderTargetEnds.Add(semaphore);
                 }
@@ -154,19 +166,19 @@ public class DockSceneRenderer : IDisposable
         return (sceneTexture, dock);
     }
 
-    public IReadOnlyList<VkSemaphore> RenderSceneTextures(
-        IReadOnlyList<Scene> scenes,
-        float deltaTime,
-        uint imageIndex
-    )
+    public void BeginFrame()
     {
         _renderTargetEnds.Clear();
-        foreach (var scene in scenes)
-        {
-            var (sceneTexture, _) = GetOrCreateRenderTextureAndDock(scene);
-            sceneTexture.SetFrameInfo(new(deltaTime, imageIndex));
-        }
-        _dockManager.Draw();
+    }
+
+    public void SetScene(Scene scene)
+    {
+        GetOrCreateRenderTextureAndDock(scene);
+    }
+
+    public IReadOnlyList<VkSemaphore> EndFrame(uint imageIndex)
+    {
+        _dockManager.Draw(imageIndex);
         return _renderTargetEnds;
     }
 }

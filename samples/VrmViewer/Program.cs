@@ -15,13 +15,15 @@ internal class Program
 {
     private static unsafe void Main(string[] args)
     {
-        List<Scene> scenes = [];
-        foreach (var arg in args)
+        Scene? Model = default;
+        if (args.Length >= 1)
         {
-            if (Scene.LoadFilePath(arg) is Scene scene)
-            {
-                scenes.Add(scene);
-            }
+            Model = Scene.LoadFilePath(args[0]);
+        }
+        Scene? Motion = default;
+        if (args.Length >= 2)
+        {
+            Motion = Scene.LoadFilePath(args[1]);
         }
 
         var loggerFactory = LoggerFactory.Create(builder =>
@@ -138,27 +140,7 @@ internal class Program
                 continue;
             }
 
-            if (!io.WantCaptureMouse)
-            {
-                // background scene
-                // if (io.MouseDown[1])
-                // {
-                //     view.YawPitch(io.MouseDelta.X, -io.MouseDelta.Y);
-                // }
-                // if (io.MouseDown[2])
-                // {
-                //     view.ScreenShift(
-                //         io.MouseDelta.X,
-                //         -io.MouseDelta.Y,
-                //         projection.FovY,
-                //         projection.ViewportSize.Y
-                //     );
-                // }
-                // view.Dolly(io.MouseWheel);
-            }
-
             // Start the Dear ImGui frame
-            //         ImGui_ImplVulkan_NewFrame();
             implGlfw.NewFrame();
             ImGui.NewFrame();
 
@@ -166,86 +148,79 @@ internal class Program
             //     draw_data.DisplaySize.X <= 0.0f || draw_data.DisplaySize.Y <= 0.0f
             // );
             // if (!is_minimized)
-            {
-                if (
-                    swapchain.Acquire()
-                    is not
-                    (
-                        uint imageIndex,
-                        VkSemaphore imageAvailableSemaphore,
-                        VkSemaphore renderFinishedSemaphore,
-                        VkFence inFlightFence
-                    )
+            if (
+                swapchain.Acquire()
+                is not
+                (
+                    uint imageIndex,
+                    VkSemaphore imageAvailableSemaphore,
+                    VkSemaphore renderFinishedSemaphore,
+                    VkFence inFlightFence
                 )
-                {
-                    resized = true;
-                    continue;
-                }
+            )
+            {
+                resized = true;
+                continue;
+            }
 
-                // var renderTargetEnds = sceneManager.DrawDock(delta, flight.ImageIndex);
-                // render scenes to renderTexture
-                var renderTargetEnds = dockManager.RenderSceneTextures(
-                    scenes,
-                    io.DeltaTime,
-                    imageIndex
-                );
+            // render scenes to renderTexture
+            dockManager.BeginFrame();
+            if (Model is Scene modelScene)
+            {
+                modelScene.AddDelta(io.DeltaTime);
+                dockManager.SetScene(modelScene);
+            }
+            if (Motion is Scene motionScene)
+            {
+                motionScene.AddDelta(io.DeltaTime);
+                dockManager.SetScene(motionScene);
+            }
+            var renderTargetEnds = dockManager.EndFrame(imageIndex);
 
-                // Rendering
-                ImGui.Render();
-                var draw_data = ImGui.GetDrawData();
+            //
+            // Rendering
+            //
+            ImGui.Render();
+            var draw_data = ImGui.GetDrawData();
 
-                // bool is_minimized = (
-                //     draw_data.DisplaySize.X <= 0.0f || draw_data.DisplaySize.Y <= 0.0f
-                // );
+            VkClearValue clearColor = default;
+            clearColor.color.float32[0] = clear_color.X * clear_color.W;
+            clearColor.color.float32[1] = clear_color.Y * clear_color.W;
+            clearColor.color.float32[2] = clear_color.Z * clear_color.W;
+            clearColor.color.float32[3] = clear_color.W;
+            var commandBuffer = renderTarget.BeginRendering(
+                imageIndex,
+                swapchain.Images[imageIndex],
+                swapchain.Extent,
+                [clearColor]
+            );
 
-                VkClearValue clearColor = default;
-                clearColor.color.float32[0] = clear_color.X * clear_color.W;
-                clearColor.color.float32[1] = clear_color.Y * clear_color.W;
-                clearColor.color.float32[2] = clear_color.Z * clear_color.W;
-                clearColor.color.float32[3] = clear_color.W;
-                // if (
-                //     g_MainWindowData.BeginRender(clear) is
-                //     (
-                //         uint frameIndex,
-                //         VkSemaphore image_acquired_semaphore,
-                //         VkSemaphore render_complete_semaphore,
-                //         VkCommandBuffer commandBuffer
-                //     )
-                // )
-                var commandBuffer = renderTarget.BeginRendering(
+            {
+                implVulkan.RenderImDrawData(
+                    picked,
+                    draw_data,
+                    commandBuffer,
                     imageIndex,
-                    swapchain.Images[imageIndex],
-                    swapchain.Extent,
-                    [clearColor]
+                    new((uint)fb_width, (uint)fb_height)
                 );
+            }
+            renderTarget.EndRendering(swapchain.Images[imageIndex]);
+            renderTarget.EndSubmitCommandBuffer(
+                [imageAvailableSemaphore, .. renderTargetEnds],
+                renderFinishedSemaphore,
+                inFlightFence
+            );
 
-                {
-                    implVulkan.RenderImDrawData(
-                        picked,
-                        draw_data,
-                        commandBuffer,
-                        imageIndex,
-                        new((uint)fb_width, (uint)fb_height)
-                    );
-                }
-                renderTarget.EndRendering(swapchain.Images[imageIndex]);
-                renderTarget.EndSubmitCommandBuffer(
-                    [imageAvailableSemaphore],
-                    renderFinishedSemaphore,
-                    inFlightFence
-                );
+            if (!swapchain.Present(imageIndex, renderFinishedSemaphore))
+            {
+                resized = true;
+            }
 
-                if (!swapchain.Present(imageIndex, renderFinishedSemaphore))
+            if (!io.WantCaptureKeyboard)
+            {
+                if (ImGui.IsKeyDown(ImGuiKey.Escape) || ImGui.IsKeyDown(ImGuiKey.Q))
                 {
-                    resized = true;
-                }
-
-                if (!io.WantCaptureKeyboard)
-                {
-                    if (ImGui.IsKeyDown(ImGuiKey.Escape) || ImGui.IsKeyDown(ImGuiKey.Q))
-                    {
-                        break;
-                    }
+                    break;
                 }
             }
         }

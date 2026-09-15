@@ -6,24 +6,24 @@ namespace VrmImpl.Gui;
 
 public class DockManager
 {
-    private readonly List<Dock> _docks = [];
+    private readonly List<Dock<uint>> _docks = [];
     private bool _opt_fullscreen = true;
     private bool _opt_padding = false;
     private ImGuiDockNodeFlags _dockspace_flags = ImGuiDockNodeFlags.PassthruCentralNode;
 
     public DockManager() { }
 
-    public void AddDock(Dock dock)
+    public void AddDock(Dock<uint> dock)
     {
         _docks.Add(dock);
     }
 
-    public void AddDock(string name, string shortCut, DrawDelegate draw)
+    public void AddDock(string name, string shortCut, DrawDelegate<uint> draw)
     {
         AddDock(new(name, shortCut, draw));
     }
 
-    public void Draw()
+    public void Draw(uint imageIndex)
     {
         BeginDockSpace("DOCK_SPACE");
 
@@ -74,7 +74,7 @@ public class DockManager
 
         foreach (var dock in _docks)
         {
-            dock.Draw();
+            dock.Draw(imageIndex);
         }
 
         EndDockSpace();

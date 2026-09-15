@@ -30,8 +30,8 @@
             "program": "${workspaceFolder}/samples/VrmViewer/bin/Debug/net10.0/VrmViewer.dll",
             "args": [
                 "${env:ASSETS_DIR}/vrm/AliciaSolid_vrm-0.51.vrm",
-                "${env:ASSETS_DIR}/glTF-Sample-Models-main/2.0/CesiumMan/glTF-Binary/CesiumMan.glb",
                 "${env:ASSETS_DIR}/bvh/vrm10viewer_test_motion.bvh"
+                // "${env:ASSETS_DIR}/glTF-Sample-Models-main/2.0/CesiumMan/glTF-Binary/CesiumMan.glb",
             ],
             "cwd": "${workspaceFolder}",
             "stopAtEntry": false,

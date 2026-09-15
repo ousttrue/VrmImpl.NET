@@ -40,14 +40,14 @@ public class SceneTexture : IDisposable
     private (RenderTextureObject, VkDescriptorSet[])? _renderTexture;
     private uint _frameCount = 0;
 
-    public record struct FrameInfo(double Delta, uint ImageIndex) { }
+    // public record struct FrameInfo(double Delta, uint ImageIndex) { }
 
-    private FrameInfo _frameInfo = default;
+    // private FrameInfo _frameInfo = default;
 
-    public void SetFrameInfo(FrameInfo info)
-    {
-        _frameInfo = info;
-    }
+    // public void SetFrameInfo(FrameInfo info)
+    // {
+    //     _frameInfo = info;
+    // }
 
     public SceneTexture(
         string name,
@@ -146,7 +146,7 @@ public class SceneTexture : IDisposable
         }
     }
 
-    public unsafe (VkSemaphore, VkDescriptorSet)? Render(VkExtent2D extent)
+    public unsafe (VkSemaphore, VkDescriptorSet)? Render(uint imageIndex, VkExtent2D extent)
     {
         Resize(extent);
 
@@ -157,7 +157,6 @@ public class SceneTexture : IDisposable
 
         var frameCount = _frameCount++;
 
-        Scene.AddDelta(_frameInfo.Delta);
         var drawlist = Scene.MakeDrawList();
         var world = new WorldInfo(
             CameraView.GetViewMatrix(),
@@ -165,14 +164,14 @@ public class SceneTexture : IDisposable
         );
 
         var (commandBuffer, imageView, image, semaphore) = renderTexture.RenderTarget.BeginCommand(
-            _frameInfo.ImageIndex
+            imageIndex
         );
 
-        _renderer.ApplyAnimation(drawlist, _frameInfo.ImageIndex, commandBuffer);
+        _renderer.ApplyAnimation(drawlist, imageIndex, commandBuffer);
 
         _lineRenderer.Clear();
         _lineRenderer.Push(MemoryMarshal.Cast<byte, LineVertex>(XZGrid.CreateMesh().Vertices.Data));
-        _lineRenderer.ApplyAnimation(Scene.Nodes, _frameInfo.ImageIndex, commandBuffer);
+        _lineRenderer.ApplyAnimation(Scene.Nodes, imageIndex, commandBuffer);
 
         renderTexture.RenderTarget.BeginRendering(
             commandBuffer,
@@ -190,7 +189,7 @@ public class SceneTexture : IDisposable
         // render scene
         _lineRenderer.Render(
             frameCount,
-            _frameInfo.ImageIndex,
+            imageIndex,
             commandBuffer,
             renderTexture.RenderTarget.Extent,
             world
@@ -201,7 +200,7 @@ public class SceneTexture : IDisposable
             _renderer.Render(
                 frameCount,
                 draw,
-                _frameInfo.ImageIndex,
+                imageIndex,
                 commandBuffer,
                 renderTexture.RenderTarget.Extent,
                 world
@@ -217,6 +216,6 @@ public class SceneTexture : IDisposable
             VkImageLayout.ShaderReadOnlyOptimal
         );
 
-        return (semaphore, descs[_frameInfo.ImageIndex]);
+        return (semaphore, descs[imageIndex]);
     }
 }
