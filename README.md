@@ -6,6 +6,14 @@
 
 ## samples/VulkanTriangle
 
+- vulkan-1.3 + DynamicRendering (without RenderPass).
+
 ## samples/VulkanTriangleImgui
 
-## gui/VrmViewer
+- ImGui.NET. csharp port of imgui_impl_glfw and imgui_impl_vulkan.
+
+## samples/VrmViewer
+
+- imgui docking.
+- GLB loader.
+- BVH loader.
