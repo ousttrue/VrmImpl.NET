@@ -1,9 +1,12 @@
+using System.Globalization;
 using System.Numerics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Microsoft.VisualBasic;
 using VrmImpl.Drawlist;
+using VrmImpl.SceneGraph.Gltf.Extensions.Vrm0x;
 
-namespace VrmImpl.SceneGraph;
+namespace VrmImpl.SceneGraph.Gltf;
 
 public record GltfLoader(JsonObject Root, ArraySegment<byte> Bin, string FilePath)
 {
@@ -380,5 +383,113 @@ public record GltfLoader(JsonObject Root, ArraySegment<byte> Bin, string FilePat
         }
         animation.CalcDuration();
         return animation;
+    }
+
+    public static Scene? LoadScene(ArraySegment<byte> json, string path, ArraySegment<byte> bin)
+    {
+        var gltfRoot = JsonNode.Parse(json);
+        if (gltfRoot is null)
+        {
+            Console.Out.WriteLine("no gltf root ?");
+            return default;
+        }
+
+        var gltf = new GltfLoader(gltfRoot.AsObject(), bin, path);
+        var materials = gltf.LoadMaterials();
+        var meshes = gltf.LoadMeshes(materials);
+        var skins = gltf.LoadSkins();
+        var (Root, Nodes) = gltf.LoadHierarchy(meshes, skins);
+        var scene = new Scene(Root, Nodes, Path.GetFileName(path));
+
+        if (gltf.Root.TryGetPropertyValue("animations", out var animations))
+        {
+            if (animations is null)
+            {
+                throw new Exception();
+            }
+            foreach (var animationNode in animations.AsArray())
+            {
+                var animation = gltf.LoadAnimation(animationNode, Nodes);
+                scene.Animations.Add(animation);
+            }
+            scene.CurrentAnimation = new Random().Next(scene.Animations.Count);
+        }
+
+        //
+        // vrm
+        //
+        if (gltf.Root.GetProperty("extensions") is JsonObject extensions)
+        {
+            if (extensions.GetObject("VRM") is JsonObject vrm0x)
+            {
+                if (vrm0x.GetObject("humanoid") is JsonObject humanoid)
+                {
+                    var vrmHumanoid =
+                        JsonSerializer.Deserialize<Vrm0xHumanoid>(humanoid)
+                        ?? throw new Exception();
+                    foreach (var humanBone in vrmHumanoid.humanBones)
+                    {
+                        if (
+                            Enum.TryParse<HumanBoneType>(
+                                humanBone.bone,
+                                ignoreCase: true,
+                                out var parsed
+                            )
+                        )
+                        {
+                            if (parsed == HumanBoneType.LeftThumbProximal)
+                            {
+                                parsed = HumanBoneType.LeftThumbMetacarpal;
+                            }
+                            else if (parsed == HumanBoneType.RightThumbProximal)
+                            {
+                                parsed = HumanBoneType.RightThumbMetacarpal;
+                            }
+                            Nodes[humanBone.node].HumanBone = parsed;
+                        }
+                        else
+                        {
+                            if (humanBone.bone == "leftThumbIntermediate")
+                            {
+                                parsed = HumanBoneType.LeftThumbProximal;
+                            }
+                            else if (humanBone.bone == "rightThumbIntermediate")
+                            {
+                                parsed = HumanBoneType.RightThumbProximal;
+                            }
+                        }
+                        if (parsed == HumanBoneType.Hips)
+                        {
+                            // Rotate Y-Axis 180
+                            Nodes[humanBone.node].GetHumanBone(HumanBoneType.Hips)!.Rotation =
+                                Quaternion.CreateFromYawPitchRoll(MathF.PI, 0, 0);
+                        }
+                    }
+                }
+            }
+            if (extensions.GetObject("VRMC_vrm") is JsonObject vrm10)
+            {
+                if (vrm10.GetObject("humanoid") is JsonObject humanoid)
+                {
+                    if (humanoid.GetObject("humanBones") is JsonObject humanBones)
+                    {
+                        foreach (var (k, v) in humanBones)
+                        {
+                            if (Enum.TryParse<HumanBoneType>(k, ignoreCase: true, out var bone))
+                            {
+                                var node = v.GetPropertyValue<int>("node");
+                                Nodes[node].HumanBone = bone;
+                            }
+                            else
+                            {
+                                throw new Exception($"unknown bone: {k}");
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return scene;
     }
 }

@@ -1,6 +1,6 @@
 using System;
 
-namespace UniHumanoid
+namespace VrmImpl.SceneGraph.Bvh
 {
     public class BvhException : Exception
     {

@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace VrmImpl.SceneGraph;
+namespace VrmImpl.SceneGraph.Gltf;
 
 struct Glb(ArraySegment<byte> json, ArraySegment<byte> bin)
 {

@@ -21,15 +21,25 @@ static class JsonNodeExtensions
         return val.GetValue<T>();
     }
 
-    public static T GetPropertyValueOrDefault<T>(this JsonNode? self, string key, T defaultValue)
+    public static JsonNode? GetProperty(this JsonNode? self, string key)
     {
-        try
+        if (self is JsonObject o)
         {
-            return self.GetPropertyValue<T>(key);
+            if (o.TryGetPropertyValue(key, out var value))
+            {
+                return value;
+            }
         }
-        catch (InvalidDataException)
-        {
-            return defaultValue;
-        }
+        return default;
+    }
+
+    public static JsonObject? GetObject(this JsonNode? self, string key)
+    {
+        return self.GetProperty(key)?.AsObject();
+    }
+
+    public static JsonArray? GetArray(this JsonNode? self, string key)
+    {
+        return self.GetProperty(key)?.AsArray();
     }
 }

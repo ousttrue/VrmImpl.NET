@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace UniHumanoid
+namespace VrmImpl.SceneGraph.Bvh
 {
     public class BvhNode
     {

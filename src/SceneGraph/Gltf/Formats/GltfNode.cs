@@ -1,4 +1,4 @@
-namespace VrmImpl.SceneGraph;
+namespace VrmImpl.SceneGraph.Gltf;
 
 class GltfNode
 {

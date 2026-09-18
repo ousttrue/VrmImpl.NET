@@ -26,6 +26,13 @@ internal class Program
             Motion = Scene.LoadFilePath(args[1]);
         }
 
+        {
+            if (Model is Scene model && Motion is Scene motion)
+            {
+                Model.Humanoid = new Humanoid(model.Root, motion.Root);
+            }
+        }
+
         var loggerFactory = LoggerFactory.Create(builder =>
         {
             builder.ClearProviders();
@@ -165,15 +172,27 @@ internal class Program
 
             // render scenes to renderTexture
             dockManager.BeginFrame();
-            if (Model is Scene modelScene)
             {
-                modelScene.AddDelta(io.DeltaTime);
-                dockManager.SetScene(modelScene);
+                if (Motion is Scene motion)
+                {
+                    motion.AddDelta(io.DeltaTime);
+                    dockManager.SetScene(motion);
+                }
             }
-            if (Motion is Scene motionScene)
             {
-                motionScene.AddDelta(io.DeltaTime);
-                dockManager.SetScene(motionScene);
+                if (Model is Scene model)
+                {
+                    model.AddDelta(io.DeltaTime);
+                    dockManager.SetScene(model);
+                    if (Motion is Scene motion)
+                    {
+                        // copy pose
+                        if (model.Humanoid is Humanoid humanoid)
+                        {
+                            humanoid.Process();
+                        }
+                    }
+                }
             }
             var renderTargetEnds = dockManager.EndFrame(imageIndex);
 

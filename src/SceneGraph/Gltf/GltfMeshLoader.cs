@@ -4,7 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using VrmImpl.Drawlist;
 
-namespace VrmImpl.SceneGraph;
+namespace VrmImpl.SceneGraph.Gltf;
 
 /// <summary>
 /// byte, ushort, uint の index を byte[] に cast して保持してみたが

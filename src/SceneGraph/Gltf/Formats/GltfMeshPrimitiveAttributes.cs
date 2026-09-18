@@ -1,4 +1,4 @@
-namespace VrmImpl.SceneGraph;
+namespace VrmImpl.SceneGraph.Gltf;
 
 public record GltfMeshPrimitiveAttributes(
     int POSITION,
