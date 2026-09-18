@@ -252,12 +252,7 @@ static unsafe class Program
                 //         VkCommandBuffer commandBuffer
                 //     )
                 // )
-                var commandBuffer = renderTarget.BeginRendering(
-                    imageIndex,
-                    swapchain.Images[imageIndex],
-                    swapchain.Extent,
-                    [clearColor]
-                );
+                var commandBuffer = renderTarget.BeginRendering(imageIndex, [clearColor]);
 
                 {
                     implVulkan.RenderImDrawData(
@@ -268,8 +263,9 @@ static unsafe class Program
                         new((uint)fb_width, (uint)fb_height)
                     );
                 }
-                renderTarget.EndRendering(swapchain.Images[imageIndex]);
+                renderTarget.EndRendering(imageIndex);
                 renderTarget.EndSubmitCommandBuffer(
+                    imageIndex,
                     [imageAvailableSemaphore],
                     renderFinishedSemaphore,
                     inFlightFence

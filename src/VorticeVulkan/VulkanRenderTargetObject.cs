@@ -8,35 +8,63 @@ namespace VrmImpl.VorticeVulkan;
 public class VulkanRenderTargetObject : IDisposable
 {
     private readonly VkDeviceApi _vkd;
-    private readonly uint _graphicsQueueFamilyIndex;
     private readonly VkQueue _graphicsQueue;
+    private VkExtent2D _extent;
 
     private VkRenderPass? _renderPass;
+
+    private VkImage[] _images;
     private VkImageView[] _imageViews = [];
     private VkFramebuffer[] _framebuffers = [];
+    private readonly uint _graphicsQueueFamilyIndex;
     private VkCommandPool? _commandPool;
-    private VkCommandBuffer _commandBuffer;
+    private VkCommandBuffer[] _commandBuffers;
 
     public VulkanRenderTargetObject(
         VkDeviceApi vkd,
-        uint graphicsFamily,
+        uint graphicsQueueFamilyIndex,
         VkFormat format,
         VkExtent2D extent,
         VkImage[] images
     )
     {
         _vkd = vkd;
-        _graphicsQueueFamilyIndex = graphicsFamily;
-        vkd.vkGetDeviceQueue(graphicsFamily, 0, out _graphicsQueue);
+        _graphicsQueueFamilyIndex = graphicsQueueFamilyIndex;
+        vkd.vkGetDeviceQueue(graphicsQueueFamilyIndex, 0, out _graphicsQueue);
 
         Create(format, extent, images);
     }
 
-    public unsafe void Create(VkFormat format, VkExtent2D extent, VkImage[] images)
+    public void Create(VkFormat format, VkExtent2D extent, VkImage[] images)
     {
         Dispose();
+        _extent = extent;
+        _images = images;
+        (_imageViews, _renderPass, _framebuffers, _commandPool, _commandBuffers) = _Create(
+            _vkd,
+            format,
+            extent,
+            images,
+            _graphicsQueueFamilyIndex
+        );
+    }
+
+    private static unsafe (
+        VkImageView[],
+        VkRenderPass,
+        VkFramebuffer[],
+        VkCommandPool,
+        VkCommandBuffer[]
+    ) _Create(
+        VkDeviceApi vkd,
+        VkFormat format,
+        VkExtent2D extent,
+        VkImage[] images,
+        uint graphicsQueueFamilyIndex
+    )
+    {
+        var imageViews = new VkImageView[images.Length];
         {
-            _imageViews = new VkImageView[images.Length];
             for (int i = 0; i < images.Length; ++i)
             {
                 var createInfo = new VkImageViewCreateInfo
@@ -55,13 +83,10 @@ public class VulkanRenderTargetObject : IDisposable
                 createInfo.subresourceRange.levelCount = 1;
                 createInfo.subresourceRange.baseArrayLayer = 0;
                 createInfo.subresourceRange.layerCount = 1;
-
-                if (_vkd.vkCreateImageView(&createInfo, null, out _imageViews[i]) != VK_SUCCESS)
-                {
-                    throw new Exception("failed to create image views!");
-                }
+                vkd.vkCreateImageView(&createInfo, null, out imageViews[i]).ThrowIfError();
             }
         }
+
         VkRenderPass renderPass;
         {
             var colorAttachment = new VkAttachmentDescription
@@ -110,18 +135,14 @@ public class VulkanRenderTargetObject : IDisposable
                 pDependencies = &dependency,
             };
 
-            if (_vkd.vkCreateRenderPass(&renderPassInfo, null, out renderPass) != VK_SUCCESS)
-            {
-                throw new Exception("failed to create render pass!");
-            }
-            _renderPass = renderPass;
+            vkd.vkCreateRenderPass(&renderPassInfo, null, out renderPass).ThrowIfError();
         }
-        {
-            _framebuffers = new VkFramebuffer[_imageViews.Length];
 
-            for (int i = 0; i < _imageViews.Length; i++)
+        var framebuffers = new VkFramebuffer[imageViews.Length];
+        {
+            for (int i = 0; i < imageViews.Length; i++)
             {
-                var attachment = _imageViews[i];
+                var attachment = imageViews[i];
 
                 var framebufferInfo = new VkFramebufferCreateInfo
                 {
@@ -134,13 +155,7 @@ public class VulkanRenderTargetObject : IDisposable
                     layers = 1,
                 };
 
-                if (
-                    _vkd.vkCreateFramebuffer(&framebufferInfo, null, out _framebuffers[i])
-                    != VK_SUCCESS
-                )
-                {
-                    throw new Exception("failed to create framebuffer!");
-                }
+                vkd.vkCreateFramebuffer(&framebufferInfo, null, out framebuffers[i]).ThrowIfError();
             }
         }
 
@@ -148,29 +163,27 @@ public class VulkanRenderTargetObject : IDisposable
         {
             sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
             flags = VkCommandPoolCreateFlags.ResetCommandBuffer,
-            queueFamilyIndex = _graphicsQueueFamilyIndex,
+            queueFamilyIndex = graphicsQueueFamilyIndex,
         };
-
-        if (_vkd.vkCreateCommandPool(&poolInfo, null, out var commandPool) != VK_SUCCESS)
-        {
-            throw new Exception("failed to create command pool!");
-        }
-        _commandPool = commandPool;
+        vkd.vkCreateCommandPool(&poolInfo, null, out var commandPool).ThrowIfError();
 
         var allocInfo = new VkCommandBufferAllocateInfo
         {
             sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
             commandPool = commandPool,
             level = VkCommandBufferLevel.Primary,
-            commandBufferCount = 1,
+            commandBufferCount = (uint)images.Length,
         };
+        var commandBuffers = stackalloc VkCommandBuffer[images.Length];
+        vkd.vkAllocateCommandBuffers(&allocInfo, commandBuffers).ThrowIfError();
 
-        VkCommandBuffer _commandBuffer;
-        if (_vkd.vkAllocateCommandBuffers(&allocInfo, &_commandBuffer) != VK_SUCCESS)
-        {
-            throw new Exception("failed to allocate command buffers!");
-        }
-        this._commandBuffer = _commandBuffer;
+        return (
+            imageViews,
+            renderPass,
+            framebuffers,
+            commandPool,
+            new ReadOnlySpan<VkCommandBuffer>(commandBuffers, images.Length).ToArray()
+        );
     }
 
     public unsafe void Dispose()
@@ -198,12 +211,14 @@ public class VulkanRenderTargetObject : IDisposable
     }
 
     public unsafe void EndSubmitCommandBuffer(
+        uint imageIndex,
         ReadOnlySpan<VkSemaphore> waitSemaphores,
         VkSemaphore renderFinishedSemaphore,
         VkFence inFlightFence
     )
     {
-        if (_vkd.vkEndCommandBuffer(_commandBuffer) != VK_SUCCESS)
+        var commandBuffer = _commandBuffers[imageIndex];
+        if (_vkd.vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
         {
             throw new Exception("failed to record command buffer!");
         }
@@ -214,7 +229,6 @@ public class VulkanRenderTargetObject : IDisposable
             VkPipelineStageFlags.ColorAttachmentOutput,
         };
         var signalSemaphores = stackalloc VkSemaphore[] { renderFinishedSemaphore };
-        var cmd = _commandBuffer;
         fixed (VkSemaphore* pWaitSemaphores = waitSemaphores)
         {
             var submitInfo = new VkSubmitInfo
@@ -224,7 +238,7 @@ public class VulkanRenderTargetObject : IDisposable
                 pWaitSemaphores = pWaitSemaphores,
                 pWaitDstStageMask = waitStages,
                 commandBufferCount = 1,
-                pCommandBuffers = &cmd,
+                pCommandBuffers = &commandBuffer,
                 signalSemaphoreCount = 1,
                 pSignalSemaphores = signalSemaphores,
             };
@@ -237,12 +251,12 @@ public class VulkanRenderTargetObject : IDisposable
 
     public unsafe VkCommandBuffer BeginRenderPass(
         uint imageIndex,
-        VkExtent2D extent,
         ReadOnlySpan<VkClearValue> clearValues
     )
     {
+        var commandBuffer = _commandBuffers[imageIndex];
         _vkd.vkResetCommandBuffer(
-            _commandBuffer, /*VkCommandBufferResetFlagBits*/
+            _commandBuffers[imageIndex], /*VkCommandBufferResetFlagBits*/
             0
         );
 
@@ -250,7 +264,7 @@ public class VulkanRenderTargetObject : IDisposable
         {
             sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
         };
-        if (_vkd.vkBeginCommandBuffer(_commandBuffer, &beginInfo) != VK_SUCCESS)
+        if (_vkd.vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS)
         {
             throw new Exception("failed to begin recording command buffer!");
         }
@@ -265,46 +279,45 @@ public class VulkanRenderTargetObject : IDisposable
             renderPassInfo.renderPass = renderPass;
         }
         renderPassInfo.renderArea.offset = new(0, 0);
-        renderPassInfo.renderArea.extent = extent;
+        renderPassInfo.renderArea.extent = _extent;
 
         fixed (VkClearValue* pClearValues = clearValues)
         {
             renderPassInfo.clearValueCount = (uint)clearValues.Length;
             renderPassInfo.pClearValues = pClearValues;
-            _vkd.vkCmdBeginRenderPass(_commandBuffer, &renderPassInfo, VkSubpassContents.Inline);
+            _vkd.vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VkSubpassContents.Inline);
         }
 
-        var viewport = new VkViewport
+        VkViewport viewport = new()
         {
             x = 0.0f,
             y = 0.0f,
-            width = extent.width,
-            height = extent.height,
+            width = _extent.width,
+            height = _extent.height,
             minDepth = 0.0f,
             maxDepth = 1.0f,
         };
-        _vkd.vkCmdSetViewport(_commandBuffer, 0, 1, &viewport);
+        _vkd.vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
-        var scissor = new VkRect2D { offset = new(0, 0), extent = extent };
-        _vkd.vkCmdSetScissor(_commandBuffer, 0, 1, &scissor);
+        var scissor = new VkRect2D { offset = new(0, 0), extent = _extent };
+        _vkd.vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-        return _commandBuffer;
+        return commandBuffer;
     }
 
-    public void EndRenderPass()
+    public void EndRenderPass(uint imageIndex)
     {
-        _vkd.vkCmdEndRenderPass(_commandBuffer);
+        _vkd.vkCmdEndRenderPass(_commandBuffers[imageIndex]);
     }
 
     public unsafe VkCommandBuffer BeginRendering(
         uint imageIndex,
-        VkImage image,
-        VkExtent2D extent,
         ReadOnlySpan<VkClearValue> clearValues
     )
     {
+        var commandBuffer = _commandBuffers[imageIndex];
         _vkd.vkResetCommandBuffer(
-            _commandBuffer, /*VkCommandBufferResetFlagBits*/
+            commandBuffer, /*VkCommandBufferResetFlagBits*/
             0
         );
 
@@ -312,7 +325,7 @@ public class VulkanRenderTargetObject : IDisposable
         {
             sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
         };
-        if (_vkd.vkBeginCommandBuffer(_commandBuffer, &beginInfo) != VK_SUCCESS)
+        if (_vkd.vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS)
         {
             throw new Exception("failed to begin recording command buffer!");
         }
@@ -334,7 +347,7 @@ public class VulkanRenderTargetObject : IDisposable
             ),
             oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
             newLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL,
-            image = image,
+            image = _images[imageIndex],
             subresourceRange = new()
             {
                 aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -348,7 +361,7 @@ public class VulkanRenderTargetObject : IDisposable
             imageMemoryBarrierCount = 1,
             pImageMemoryBarriers = &b,
         };
-        _vkd.vkCmdPipelineBarrier2(_commandBuffer, &barrierDependencyInfo);
+        _vkd.vkCmdPipelineBarrier2(commandBuffer, &barrierDependencyInfo);
 
         var color_attachment_info = new VkRenderingAttachmentInfo
         {
@@ -371,7 +384,7 @@ public class VulkanRenderTargetObject : IDisposable
         var render_info = new VkRenderingInfo
         {
             sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
-            renderArea = new() { extent = extent },
+            renderArea = new() { extent = _extent },
             layerCount = 1,
             colorAttachmentCount = 1,
             pColorAttachments = &color_attachment_info,
@@ -379,28 +392,28 @@ public class VulkanRenderTargetObject : IDisposable
             // PStencilAttachment = &depth_attachment_info,
         };
 
-        _vkd.vkCmdBeginRendering(_commandBuffer, &render_info);
+        _vkd.vkCmdBeginRendering(commandBuffer, &render_info);
 
-        var viewport = new VkViewport
+        VkViewport viewport = new()
         {
             x = 0.0f,
             y = 0.0f,
-            width = extent.width,
-            height = extent.height,
+            width = _extent.width,
+            height = _extent.height,
             minDepth = 0.0f,
             maxDepth = 1.0f,
         };
-        _vkd.vkCmdSetViewport(_commandBuffer, 0, 1, &viewport);
+        _vkd.vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
-        var scissor = new VkRect2D { offset = new(0, 0), extent = extent };
-        _vkd.vkCmdSetScissor(_commandBuffer, 0, 1, &scissor);
+        var scissor = new VkRect2D { offset = new(0, 0), extent = _extent };
+        _vkd.vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-        return _commandBuffer;
+        return commandBuffer;
     }
 
-    public unsafe void EndRendering(VkImage image)
+    public unsafe void EndRendering(uint imageIndex)
     {
-        _vkd.vkCmdEndRendering(_commandBuffer);
+        _vkd.vkCmdEndRendering(_commandBuffers[imageIndex]);
         // TransitionImageLayout(_vkd, _commandBuffer, image, VkImageLayout.PresentSrcKHR);
 
         var barrierPresent = new VkImageMemoryBarrier2
@@ -412,7 +425,7 @@ public class VulkanRenderTargetObject : IDisposable
             dstAccessMask = 0,
             oldLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL,
             newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-            image = image,
+            image = _images[imageIndex],
             subresourceRange = new()
             {
                 aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -426,7 +439,7 @@ public class VulkanRenderTargetObject : IDisposable
             imageMemoryBarrierCount = 1,
             pImageMemoryBarriers = &barrierPresent,
         };
-        _vkd.vkCmdPipelineBarrier2(_commandBuffer, &barrierPresentDependencyInfo);
+        _vkd.vkCmdPipelineBarrier2(_commandBuffers[imageIndex], &barrierPresentDependencyInfo);
     }
 
     public static unsafe void TransitionImageLayout(

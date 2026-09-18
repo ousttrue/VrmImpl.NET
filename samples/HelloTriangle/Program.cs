@@ -139,18 +139,14 @@ static class Program
             //     imageIndex,
             //     clearValues
             // );
-            var commandBuffer = renderTarget.BeginRendering(
-                imageIndex,
-                swapchain.Images[imageIndex],
-                swapchain.Extent,
-                [clearColor]
-            );
+            var commandBuffer = renderTarget.BeginRendering(imageIndex, [clearColor]);
             {
                 pipeline.RecordCommandBuffer(commandBuffer);
             }
             // renderTarget.EndRenderPass();
-            renderTarget.EndRendering(swapchain.Images[imageIndex]);
+            renderTarget.EndRendering(imageIndex);
             renderTarget.EndSubmitCommandBuffer(
+                imageIndex,
                 [imageAvailableSemaphore],
                 renderFinishedSemaphore,
                 inFlightFence

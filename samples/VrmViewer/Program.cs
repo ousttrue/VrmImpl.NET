@@ -65,7 +65,7 @@ internal class Program
             device.Api,
             new(w, h)
         );
-        using var renderTarget = new VulkanRenderTargetObject(
+        using var swapchainRenderTarget = new VulkanRenderTargetObject(
             device.Api,
             indices.GraphicsFamily,
             swapchain.Format,
@@ -123,31 +123,25 @@ internal class Program
         {
             if (window.NewFrame() is not (int fb_width, int fb_height))
             {
+                // window close
                 break;
+            }
+            if (window.IsIconified())
+            {
+                // no size. cannot rendering
+                Thread.Sleep(10);
+                continue;
             }
             var extent = new VkExtent2D(fb_width, fb_height);
             if (resized || swapchain.ShouldRecreate(extent))
             {
+                // update swapchain
                 device.Api.vkDeviceWaitIdle();
-                renderTarget.Dispose();
+                swapchainRenderTarget.Dispose();
                 swapchain.Resize(extent);
-                renderTarget.Create(swapchain.Format, extent, swapchain.Images);
+                swapchainRenderTarget.Create(swapchain.Format, extent, swapchain.Images);
                 resized = false;
             }
-            if (window.IsIconified())
-            {
-                Thread.Sleep(10);
-                continue;
-            }
-
-            // Start the Dear ImGui frame
-            implGlfw.NewFrame();
-            ImGui.NewFrame();
-
-            // bool is_minimized = (
-            //     draw_data.DisplaySize.X <= 0.0f || draw_data.DisplaySize.Y <= 0.0f
-            // );
-            // if (!is_minimized)
             if (
                 swapchain.Acquire()
                 is not
@@ -163,6 +157,12 @@ internal class Program
                 continue;
             }
 
+            //
+            // new frame
+            //
+            implGlfw.NewFrame();
+            ImGui.NewFrame();
+
             // render scenes to renderTexture
             dockManager.BeginFrame();
             if (Model is Scene modelScene)
@@ -177,39 +177,38 @@ internal class Program
             }
             var renderTargetEnds = dockManager.EndFrame(imageIndex);
 
-            //
-            // Rendering
-            //
+            // imgui drawlist
             ImGui.Render();
             var draw_data = ImGui.GetDrawData();
 
-            VkClearValue clearColor = default;
-            clearColor.color.float32[0] = clear_color.X * clear_color.W;
-            clearColor.color.float32[1] = clear_color.Y * clear_color.W;
-            clearColor.color.float32[2] = clear_color.Z * clear_color.W;
-            clearColor.color.float32[3] = clear_color.W;
-            var commandBuffer = renderTarget.BeginRendering(
-                imageIndex,
-                swapchain.Images[imageIndex],
-                swapchain.Extent,
-                [clearColor]
-            );
-
+            // render to swapchain image.
             {
-                implVulkan.RenderImDrawData(
-                    picked,
-                    draw_data,
-                    commandBuffer,
+                VkClearValue clearColor = new(
+                    clear_color.X * clear_color.W,
+                    clear_color.Y * clear_color.W,
+                    clear_color.Z * clear_color.W,
+                    clear_color.W
+                );
+                var commandBuffer = swapchainRenderTarget.BeginRendering(imageIndex, [clearColor]);
+
+                {
+                    implVulkan.RenderImDrawData(
+                        picked,
+                        draw_data,
+                        commandBuffer,
+                        imageIndex,
+                        new((uint)fb_width, (uint)fb_height)
+                    );
+                }
+
+                swapchainRenderTarget.EndRendering(imageIndex);
+                swapchainRenderTarget.EndSubmitCommandBuffer(
                     imageIndex,
-                    new((uint)fb_width, (uint)fb_height)
+                    [imageAvailableSemaphore, .. renderTargetEnds],
+                    renderFinishedSemaphore,
+                    inFlightFence
                 );
             }
-            renderTarget.EndRendering(swapchain.Images[imageIndex]);
-            renderTarget.EndSubmitCommandBuffer(
-                [imageAvailableSemaphore, .. renderTargetEnds],
-                renderFinishedSemaphore,
-                inFlightFence
-            );
 
             if (!swapchain.Present(imageIndex, renderFinishedSemaphore))
             {
